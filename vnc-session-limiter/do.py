@@ -1,10 +1,14 @@
 #!/bin/env python3
 
 import psutil
+from pathlib import Path
 
 processString='Xvnc'
 maxCount=2
 users = {}
+
+# here we can touch the stdout file we forward the stdout in crontab into... :
+Path('/var/log/killed_vnc_sessions.log').touch()
 
 for p in psutil.process_iter():
   if processString in p.name() or processString in ' '.join(p.cmdline()):
