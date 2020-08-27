@@ -20,7 +20,18 @@ function verify_domain () {
   certdir="/etc/certbotcerts/${SITE}"
   mkdir -p ${certdir}
 
-  docker run --rm -it -v ${certdir}:/etc/letsencrypt -p ${certbot_port}:3081 certbot/certbot certonly --authenticator standalone --http-01-port=3081 -d ${fulldomain} --non-interactive --agree-tos --email ${ADMINMAIL} # --force-renewal # the force-remewal can be uncommented if needed...
+  # --force-renewal # the force-remewal can be uncommented if needed...
+  out=$(docker run --rm -it -v ${certdir}:/etc/letsencrypt -p ${certbot_port}:3081 certbot/certbot certonly --authenticator standalone --http-01-address=0.0.0.0 --http-01-port=3081 -d ${fulldomain} --non-interactive --agree-tos --email ${ADMINMAIL})
+  rc="$?"
+  echo "rc: $rc"
+  echo "out: $out"
+  
+  if [[ $out == *"Certificate not yet due"* ]]; then
+    echo "certificate is not yet due"
+  else
+    echo "restarting haproxy"
+    systemctl restart haproxy_docker.service
+  fi
 
   # haproxy needs key and cert in one file. So we'll create it:
   key_and_cert_dir="${certdir}/live/${fulldomain}"
