@@ -20,30 +20,39 @@ function verify_domain () {
   certdir="/etc/certbotcerts/${SITE}"
   mkdir -p ${certdir}
 
+  # certbot arguments:
   # --force-renewal # the force-remewal can be uncommented if needed...
+
+  # Docker arguments:
+  # --rm .. automatically clean up the container and remove the file system when the container exits
+  # -t .... allocate a pseudo-tty
+  # -i .... keep STDIN open even if not attached
   out=$(docker run --rm -it -v ${certdir}:/etc/letsencrypt -p ${certbot_port}:3081 certbot/certbot certonly --authenticator standalone --http-01-address=0.0.0.0 --http-01-port=3081 -d ${fulldomain} --non-interactive --agree-tos --email ${ADMINMAIL})
   rc="$?"
-  echo "rc: $rc"
-  echo "out: $out"
+
+  if [ $rc -ne 0 ]; then
+    echo "Nonzero return code.."
+    echo "rc: $rc"
+    echo "out: $out"
+  fi
   
   if [[ $out == *"Certificate not yet due"* ]]; then
-    echo "certificate is not yet due"
+    echo "certificate is not yet due..."
   else
-    echo "restarting haproxy"
+    echo "renew returned OK, restarting haproxy..."
+    
+    # haproxy needs key and cert in one file. So we'll create it:
+    key_and_cert_dir="${certdir}/live/${fulldomain}"
+    rm -rf ${key_and_cert_dir}/key_and_cert.pem
+    cat ${key_and_cert_dir}/fullchain.pem ${key_and_cert_dir}/privkey.pem >> ${key_and_cert_dir}/key_and_cert.pem
+
     systemctl restart haproxy_docker.service
+    #TODO: do restart only only?
   fi
-
-  # haproxy needs key and cert in one file. So we'll create it:
-  key_and_cert_dir="${certdir}/live/${fulldomain}"
-  rm -rf ${key_and_cert_dir}/key_and_cert.pem
-  cat ${key_and_cert_dir}/fullchain.pem ${key_and_cert_dir}/privkey.pem >> ${key_and_cert_dir}/key_and_cert.pem
-
 }
 
-# main()
-
-# verify domains:
+# main() - the meat is here /list of domains:
 
 verify_domain "grafana" "ceico.cz" "jose@fzu.cz"
 verify_domain "jh1" "ceico.cz" "jose@fzu.cz"
-
+verify_domain "repo.koios" "ceico.cz" "jose@fzu.cz"
